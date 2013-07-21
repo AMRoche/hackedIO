@@ -4,9 +4,16 @@ var cubes = [];
 var renderer = new THREE.CanvasRenderer({
 	canvas : utils.getById("imgCan")
 });
+var timed = 10000;
+var enemies = 0;
+var timeLeft = 60;
+utils.getById("time").innerHTML = "Time to new enemy: " + timed / 1000 + " seconds.";
+utils.getById("spawn").innerHTML = "Targets hit: " + enemies + ".";
+utils.getById("timeRemain").innerHTML = "Time Left: " + timeLeft + ".";
 utils.getById("targeting").style.display = "block";
 var timestamp = new Date().getTime();
-var vel = [0,0,0]; //x,y,z
+var vel = [0, 0, 0];
+//x,y,z
 var yaw, pitch, roll;
 renderer.setSize(640, 360);
 camera.useQuarternian = true;
@@ -86,14 +93,15 @@ function parseVals() {
 	if (yaw < 0) {
 		yaw = 360 + yaw
 	}
-	
+
 	camera.rotation.y = (360 - yaw) / 57.2957795;
 	camera.rotation.z = (roll * -1) / 57.2957795;
-} 
+}
+
 //window.setInterval(checkVel,250);
 
-function checkVel(){
-	vel = [parseInt(utils.getById("xVelocity").innerHTML,10)/(timestamp - new Date().getTime()),parseInt(utils.getById("yVelocity").innerHTML,10)/(timestamp - new Date().getTime()),parseInt(utils.getById("zVelocity").innerHTML/(timestamp - new Date().getTime()),10)];
+function checkVel() {
+	vel = [parseInt(utils.getById("xVelocity").innerHTML, 10) / (timestamp - new Date().getTime()), parseInt(utils.getById("yVelocity").innerHTML, 10) / (timestamp - new Date().getTime()), parseInt(utils.getById("zVelocity").innerHTML / (timestamp - new Date().getTime()), 10)];
 	console.log(vel);
 	console.log(camera.position.x);
 	console.log(camera.position.y);
@@ -101,61 +109,94 @@ function checkVel(){
 	camera.position.x += vel[2];
 	camera.position.y += vel[1];
 	camera.position.z += vel[0];
-	
-	if(camera.position.x > utils.cubeSize || camera.position.x < 0){}
-	if(camera.position.y > utils.cubeSize|| camera.position.x < 0){}
-	if(camera.position.z > utils.cubeSize|| camera.position.x < 0){}
-	
+
+	if (camera.position.x > utils.cubeSize || camera.position.x < 0) {
+	}
+	if (camera.position.y > utils.cubeSize || camera.position.x < 0) {
+	}
+	if (camera.position.z > utils.cubeSize || camera.position.x < 0) {
+	}
+
 }
-render(); 
-document.addEventListener("keypress",
-function(event) {
-      if (event.which == 13 || event.keyCode == 13) {
-           if(fire() == true){
-           	console.log("BANG");	
-           }
-           else{
-           	console.log("MISS");
-          }
-          return false;
-       }
-    return true;
+
+render();
+document.addEventListener("keypress", function(event) {
+	if (event.which == 13 || event.keyCode == 13) {
+		if (fire() == true) {
+			console.log("BANG");
+		} else {
+			console.log("MISS");
+		}
+		return false;
+	}
+	return true;
 });
 
-function fire(){
+function fire() {
 	//grab the context from your destination canvas
-//call its drawImage() function passing it the source canvas directly
-var context = document.getElementById("imgCan").getContext('2d');
-var imgd = context.getImageData(300, 160, 40, 40);
-var pix = imgd.data;
+	//call its drawImage() function passing it the source canvas directly
+	var context = document.getElementById("imgCan").getContext('2d');
+	var imgd = context.getImageData(300, 160, 40, 40);
+	var pix = imgd.data;
 
-var r = 0;
-var g = 0;
-var b = 0;
-// Loop over each pixel and invert the color.
-for (var i = 0, n = pix.length; i < n; i += 4) {
-    r  +=  pix[i]; // red
-    g  +=  pix[i+1]; // green
-    b  +=  pix[i+2]; // blue
-    // i+3 is alpha (the fourth element)
-}
-r = r/(pix.length/4);
-g = g/(pix.length/4);
-b = b/(pix.length/4);
-console.log(r+","+g+","+b);
-var colours = [[0,80,0],[80,0,80],[0,0,80],[80,0,0]];
-for(var i in colours){
-	var diff =	Math.pow((r-colours[i][0]),2) +Math.pow((g-colours[i][1]),2)+Math.pow((b-colours[i][2]),2)
-	if((Math.sqrt(diff))< 20){
-		scene.remove(cubes[i][0]);
-		window.setTimeout(function(){
-		var zed = cubes[i][0];
-	zed.position = cubes[i][1];
-	scene.add(cubes[i][0]);
-		},10000);
-		return true;
+	var r = 0;
+	var g = 0;
+	var b = 0;
+	// Loop over each pixel and invert the color.
+	for (var i = 0, n = pix.length; i < n; i += 4) {
+		r += pix[i];
+		// red
+		g += pix[i + 1];
+		// green
+		b += pix[i + 2];
+		// blue
+		// i+3 is alpha (the fourth element)
+	}
+	r = r / (pix.length / 4);
+	g = g / (pix.length / 4);
+	b = b / (pix.length / 4);
+	console.log(r + "," + g + "," + b);
+	var colours = [[0, 80, 0], [80, 0, 80], [0, 0, 80], [80, 0, 0]];
+	for (var i in colours) {
+		var diff = Math.pow((r - colours[i][0]), 2) + Math.pow((g - colours[i][1]), 2) + Math.pow((b - colours[i][2]), 2)
+		if ((Math.sqrt(diff)) < 20) {
+			utils.getById("time").innerHTML = "Time to new enemy: " + timed / 1000 + " seconds.";
+			utils.getById("spawn").innerHTML = "Targets hit: " + enemies + ".";
+			scene.remove(cubes[i][0]);
+			window.setTimeout(function() {
+				var zed = cubes[i][0];
+				zed.position = cubes[i][1];
+				scene.add(cubes[i][0]);
+			}, timed);
+			if(timed > 4000){
+			timed -= 500;
+			}
+			enemies++;
+			return true;
+		}
 	}
 }
-}
 
+var boolTester = false;
+function startGame() {
+	if (boolTester == false) {
+		boolTester = true;
+		timed = 10000;
+			enemies = 0;
+			utils.getById("time").innerHTML = "Time to new enemy: " + timed / 1000 + " seconds.";
+			utils.getById("spawn").innerHTML = "Targets hit: " + enemies + ".";
+		var docInt = window.setInterval(function() {
+			
+			timeLeft--;
+			
+			utils.getById("timeRemain").innerHTML = "Time Left: " + timeLeft + ".";
+			if (timeLeft <= 0) {
+				boolTester = false;
+				window.clearInterval(docInt);
+				timeLeft = 60;
+				utils.getById("timeRemain").innerHTML = "Time Left: " + timeLeft + ".";
+			}
+		}, 1000);
+	}
+}
 
