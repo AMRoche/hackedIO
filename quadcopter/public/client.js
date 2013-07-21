@@ -22,9 +22,8 @@
     });
   };
   faye.subscribe("/drone/image", function(src) {
-    return $("#cam").attr({
-      src: src
-    });
+    return $("#cam").attr({src: src});
+  //console.log(src);
   });
   keymap = {
     87: {

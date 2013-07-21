@@ -7,7 +7,7 @@
   drone.config('general:navdata_demo', 'TRUE');
   app = express();
   app.configure(function() {
-    app.set('port', process.env.PORT || 3000);
+    app.set('port', process.env.PORT || 3002);
     app.use(app.router);
     app.use(express.static(path.join(__dirname, 'public')));
     return app.use("/components", express.static(path.join(__dirname, 'components')));
