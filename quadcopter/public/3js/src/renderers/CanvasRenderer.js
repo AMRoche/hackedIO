@@ -18,7 +18,11 @@ THREE.CanvasRenderer = function ( parameters ) {
 			? parameters.canvas
 			: document.createElement( 'canvas' ),
 
-	_canvasWidth, _canvasHeight, _canvasWidthHalf, _canvasHeightHalf,
+	_canvasWidth = _canvas.width,
+	_canvasHeight = _canvas.height,
+	_canvasWidthHalf = Math.floor( _canvasWidth / 2 ),
+	_canvasHeightHalf = Math.floor( _canvasHeight / 2 ),
+	
 	_context = _canvas.getContext( '2d' ),
 
 	_clearColor = new THREE.Color( 0x000000 ),
@@ -54,7 +58,7 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 	_lightColor = new THREE.Color(),
 
-	_patterns = {}, _imagedatas = {},
+	_patterns = {},
 
 	_near, _far,
 
@@ -117,8 +121,8 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 	this.devicePixelRatio = parameters.devicePixelRatio !== undefined
 				? parameters.devicePixelRatio
-				: window.devicePixelRatio !== undefined
-					? window.devicePixelRatio
+				: self.devicePixelRatio !== undefined
+					? self.devicePixelRatio
 					: 1;
 
 	this.autoClear = true;
@@ -244,8 +248,13 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 		}
 
-
 	};
+
+	// compatibility
+
+	this.clearColor = function () {};
+	this.clearDepth = function () {};
+	this.clearStencil = function () {};
 
 	this.render = function ( scene, camera ) {
 
@@ -285,12 +294,12 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 			_elemBox.makeEmpty();
 
-			if ( element instanceof THREE.RenderableParticle ) {
+			if ( element instanceof THREE.RenderableSprite ) {
 
 				_v1 = element;
 				_v1.x *= _canvasWidthHalf; _v1.y *= _canvasHeightHalf;
 
-				renderParticle( _v1, element, material );
+				renderSprite( _v1, element, material );
 
 			} else if ( element instanceof THREE.RenderableLine ) {
 
@@ -342,47 +351,6 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 				}
 
-			} else if ( element instanceof THREE.RenderableFace4 ) {
-
-				_v1 = element.v1; _v2 = element.v2; _v3 = element.v3; _v4 = element.v4;
-
-				if ( _v1.positionScreen.z < -1 || _v1.positionScreen.z > 1 ) continue;
-				if ( _v2.positionScreen.z < -1 || _v2.positionScreen.z > 1 ) continue;
-				if ( _v3.positionScreen.z < -1 || _v3.positionScreen.z > 1 ) continue;
-				if ( _v4.positionScreen.z < -1 || _v4.positionScreen.z > 1 ) continue;
-
-				_v1.positionScreen.x *= _canvasWidthHalf; _v1.positionScreen.y *= _canvasHeightHalf;
-				_v2.positionScreen.x *= _canvasWidthHalf; _v2.positionScreen.y *= _canvasHeightHalf;
-				_v3.positionScreen.x *= _canvasWidthHalf; _v3.positionScreen.y *= _canvasHeightHalf;
-				_v4.positionScreen.x *= _canvasWidthHalf; _v4.positionScreen.y *= _canvasHeightHalf;
-
-				_v5.positionScreen.copy( _v2.positionScreen );
-				_v6.positionScreen.copy( _v4.positionScreen );
-
-				if ( material.overdraw > 0 ) {
-
-					expand( _v1.positionScreen, _v2.positionScreen, material.overdraw );
-					expand( _v2.positionScreen, _v4.positionScreen, material.overdraw );
-					expand( _v4.positionScreen, _v1.positionScreen, material.overdraw );
-
-					expand( _v3.positionScreen, _v5.positionScreen, material.overdraw );
-					expand( _v3.positionScreen, _v6.positionScreen, material.overdraw );
-
-				}
-
-				_elemBox.setFromPoints( [
-					_v1.positionScreen,
-					_v2.positionScreen,
-					_v3.positionScreen,
-					_v4.positionScreen
-				] );
-
-				if ( _clipBox.isIntersectionBox( _elemBox ) === true ) {
-
-					renderFace4( _v1, _v2, _v3, _v4, _v5, _v6, element, material );
-
-				}
-
 			}
 
 			/* DEBUG
@@ -424,13 +392,13 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 			} else if ( light instanceof THREE.DirectionalLight ) {
 
-				// for particles
+				// for sprites
 
 				_directionalLights.add( lightColor );
 
 			} else if ( light instanceof THREE.PointLight ) {
 
-				// for particles
+				// for sprites
 
 				_pointLights.add( lightColor );
 
@@ -450,7 +418,7 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 			if ( light instanceof THREE.DirectionalLight ) {
 
-				var lightPosition = _vector3.getPositionFromMatrix( light.matrixWorld ).normalize();
+				var lightPosition = _vector3.setFromMatrixPosition( light.matrixWorld ).normalize();
 
 				var amount = normal.dot( lightPosition );
 
@@ -462,7 +430,7 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 			} else if ( light instanceof THREE.PointLight ) {
 
-				var lightPosition = _vector3.getPositionFromMatrix( light.matrixWorld );
+				var lightPosition = _vector3.setFromMatrixPosition( light.matrixWorld );
 
 				var amount = normal.dot( _vector3.subVectors( lightPosition, position ).normalize() );
 
@@ -482,118 +450,116 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 	}
 
-	function renderParticle( v1, element, material ) {
+	function renderSprite( v1, element, material ) {
 
 		setOpacity( material.opacity );
 		setBlending( material.blending );
 
-		var width, height, scaleX, scaleY,
-		bitmap, bitmapWidth, bitmapHeight;
+		var scaleX = element.scale.x * _canvasWidthHalf;
+		var scaleY = element.scale.y * _canvasHeightHalf;
 
-		if ( material instanceof THREE.ParticleBasicMaterial ) {
+		var dist = 0.5 * Math.sqrt( scaleX * scaleX + scaleY * scaleY ); // allow for rotated sprite
+		_elemBox.min.set( v1.x - dist, v1.y - dist );
+		_elemBox.max.set( v1.x + dist, v1.y + dist );
 
-			if ( material.map === null ) {
+		if ( _clipBox.isIntersectionBox( _elemBox ) === false ) {
 
-				scaleX = element.object.scale.x;
-				scaleY = element.object.scale.y;
+			_elemBox.makeEmpty();
+			return;
 
-				// TODO: Be able to disable this
+		}
 
-				scaleX *= element.scale.x * _canvasWidthHalf;
-				scaleY *= element.scale.y * _canvasHeightHalf;
+		if ( material instanceof THREE.SpriteMaterial ||
+			 material instanceof THREE.ParticleSystemMaterial ) { // Backwards compatibility
 
-				_elemBox.min.set( v1.x - scaleX, v1.y - scaleY );
-				_elemBox.max.set( v1.x + scaleX, v1.y + scaleY );
+			var texture = material.map;
 
-				if ( _clipBox.isIntersectionBox( _elemBox ) === false ) {
+			if ( texture !== null ) {
 
-					_elemBox.makeEmpty();
-					return;
+				if ( texture.hasEventListener( 'update', onTextureUpdate ) === false ) {
+
+					if ( texture.image !== undefined && texture.image.width > 0 ) {
+
+						textureToPattern( texture );
+
+					}
+
+					texture.addEventListener( 'update', onTextureUpdate );
 
 				}
+
+				var pattern = _patterns[ texture.id ];
+
+				if ( pattern !== undefined ) {
+
+					setFillStyle( pattern );
+
+				} else {
+
+					setFillStyle( 'rgba( 0, 0, 0, 1 )' );
+
+				}
+
+				//
+
+				var bitmap = texture.image;
+
+				var ox = bitmap.width * texture.offset.x;
+				var oy = bitmap.height * texture.offset.y;
+
+				var sx = bitmap.width * texture.repeat.x;
+				var sy = bitmap.height * texture.repeat.y;
+
+				var cx = scaleX / sx;
+				var cy = scaleY / sy;
+
+				_context.save();
+				_context.translate( v1.x, v1.y );
+				if ( material.rotation !== 0 ) _context.rotate( material.rotation );
+				_context.translate( - scaleX / 2, - scaleY / 2 );
+				_context.scale( cx, cy );
+				_context.translate( - ox, - oy );
+				_context.fillRect( ox, oy, sx, sy );
+				_context.restore();
+
+			} else { // no texture
 
 				setFillStyle( material.color.getStyle() );
 
 				_context.save();
 				_context.translate( v1.x, v1.y );
-				_context.rotate( - element.rotation );
-				_context.scale( scaleX, scaleY );
-				_context.fillRect( -1, -1, 2, 2 );
-				_context.restore();
-
-			} else {
-
-				bitmap = material.map.image;
-				bitmapWidth = bitmap.width >> 1;
-				bitmapHeight = bitmap.height >> 1;
-
-				scaleX = element.scale.x * _canvasWidthHalf;
-				scaleY = element.scale.y * _canvasHeightHalf;
-
-				width = scaleX * bitmapWidth;
-				height = scaleY * bitmapHeight;
-
-				// TODO: Rotations break this...
-
-				_elemBox.min.set( v1.x - width, v1.y - height );
-				_elemBox.max.set( v1.x + width, v1.y + height );
-
-				if ( _clipBox.isIntersectionBox( _elemBox ) === false ) {
-
-					_elemBox.makeEmpty();
-					return;
-
-				}
-
-				_context.save();
-				_context.translate( v1.x, v1.y );
-				_context.rotate( - element.rotation );
+				if ( material.rotation !== 0 ) _context.rotate( material.rotation );
 				_context.scale( scaleX, - scaleY );
-
-				_context.translate( - bitmapWidth, - bitmapHeight );
-				_context.drawImage( bitmap, 0, 0 );
+				_context.fillRect( - 0.5, - 0.5, 1, 1 );
 				_context.restore();
 
 			}
 
-			/* DEBUG
-			setStrokeStyle( 'rgb(255,255,0)' );
-			_context.beginPath();
-			_context.moveTo( v1.x - 10, v1.y );
-			_context.lineTo( v1.x + 10, v1.y );
-			_context.moveTo( v1.x, v1.y - 10 );
-			_context.lineTo( v1.x, v1.y + 10 );
-			_context.stroke();
-			*/
-
-		} else if ( material instanceof THREE.ParticleCanvasMaterial ) {
-
-			width = element.scale.x * _canvasWidthHalf;
-			height = element.scale.y * _canvasHeightHalf;
-
-			_elemBox.min.set( v1.x - width, v1.y - height );
-			_elemBox.max.set( v1.x + width, v1.y + height );
-
-			if ( _clipBox.isIntersectionBox( _elemBox ) === false ) {
-
-				_elemBox.makeEmpty();
-				return;
-
-			}
+		} else if ( material instanceof THREE.SpriteCanvasMaterial ) {
 
 			setStrokeStyle( material.color.getStyle() );
 			setFillStyle( material.color.getStyle() );
 
 			_context.save();
 			_context.translate( v1.x, v1.y );
-			_context.rotate( - element.rotation );
-			_context.scale( width, height );
+			if ( material.rotation !== 0 ) _context.rotate( material.rotation );
+			_context.scale( scaleX, scaleY );
 
 			material.program( _context );
 
 			_context.restore();
 
 		}
+
+		/* DEBUG
+		setStrokeStyle( 'rgb(255,255,0)' );
+		_context.beginPath();
+		_context.moveTo( v1.x - 10, v1.y );
+		_context.lineTo( v1.x + 10, v1.y );
+		_context.moveTo( v1.x, v1.y - 10 );
+		_context.lineTo( v1.x, v1.y + 10 );
+		_context.stroke();
+		*/
 
 	}
 
@@ -696,7 +662,7 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 			}
 
-			if ( material.wireframe === false && material.shading == THREE.SmoothShading && element.vertexNormalsLength == 3 ) {
+			if ( material.wireframe === false && material.shading === THREE.SmoothShading && element.vertexNormalsLength === 3 ) {
 
 				_color1.copy( _ambientLight );
 				_color2.copy( _ambientLight );
@@ -759,7 +725,7 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 					patternPath( _v1x, _v1y, _v2x, _v2y, _v3x, _v3y, _uv1x, _uv1y, _uv2x, _uv2y, _uv3x, _uv3y, material.envMap );
 
-				}/* else if ( material.envMap.mapping == THREE.SphericalRefractionMapping ) {
+				}/* else if ( material.envMap.mapping === THREE.SphericalRefractionMapping ) {
 
 
 
@@ -800,7 +766,7 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 			var normal;
 
-			if ( material.shading == THREE.FlatShading ) {
+			if ( material.shading === THREE.FlatShading ) {
 
 				normal = element.normalModelView;
 
@@ -810,7 +776,7 @@ THREE.CanvasRenderer = function ( parameters ) {
 					? strokePath( _color, material.wireframeLinewidth, material.wireframeLinecap, material.wireframeLinejoin )
 					: fillPath( _color );
 
-			} else if ( material.shading == THREE.SmoothShading ) {
+			} else if ( material.shading === THREE.SmoothShading ) {
 
 				normal = element.vertexNormalsModelView[ uv1 ];
 				_color1.setRGB( normal.x, normal.y, normal.z ).multiplyScalar( 0.5 ).addScalar( 0.5 );
@@ -833,165 +799,6 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 	}
 
-	function renderFace4( v1, v2, v3, v4, v5, v6, element, material ) {
-
-		_this.info.render.vertices += 4;
-		_this.info.render.faces ++;
-
-		setOpacity( material.opacity );
-		setBlending( material.blending );
-
-		if ( ( material.map !== undefined && material.map !== null ) || ( material.envMap !== undefined && material.envMap !== null ) ) {
-
-			// Let renderFace3() handle this
-
-			renderFace3( v1, v2, v4, 0, 1, 3, element, material );
-			renderFace3( v5, v3, v6, 1, 2, 3, element, material );
-
-			return;
-
-		}
-
-		_v1x = v1.positionScreen.x; _v1y = v1.positionScreen.y;
-		_v2x = v2.positionScreen.x; _v2y = v2.positionScreen.y;
-		_v3x = v3.positionScreen.x; _v3y = v3.positionScreen.y;
-		_v4x = v4.positionScreen.x; _v4y = v4.positionScreen.y;
-		_v5x = v5.positionScreen.x; _v5y = v5.positionScreen.y;
-		_v6x = v6.positionScreen.x; _v6y = v6.positionScreen.y;
-
-		if ( material instanceof THREE.MeshLambertMaterial || material instanceof THREE.MeshPhongMaterial ) {
-
-			_diffuseColor.copy( material.color );
-			_emissiveColor.copy( material.emissive );
-
-			if ( material.vertexColors === THREE.FaceColors ) {
-
-				_diffuseColor.multiply( element.color );
-
-			}
-
-			if ( material.wireframe === false && material.shading == THREE.SmoothShading && element.vertexNormalsLength == 4 ) {
-
-				_color1.copy( _ambientLight );
-				_color2.copy( _ambientLight );
-				_color3.copy( _ambientLight );
-				_color4.copy( _ambientLight );
-
-				calculateLight( element.v1.positionWorld, element.vertexNormalsModel[ 0 ], _color1 );
-				calculateLight( element.v2.positionWorld, element.vertexNormalsModel[ 1 ], _color2 );
-				calculateLight( element.v4.positionWorld, element.vertexNormalsModel[ 3 ], _color3 );
-				calculateLight( element.v3.positionWorld, element.vertexNormalsModel[ 2 ], _color4 );
-
-				_color1.multiply( _diffuseColor ).add( _emissiveColor );
-				_color2.multiply( _diffuseColor ).add( _emissiveColor );
-				_color3.multiply( _diffuseColor ).add( _emissiveColor );
-				_color4.multiply( _diffuseColor ).add( _emissiveColor );
-
-				_image = getGradientTexture( _color1, _color2, _color3, _color4 );
-
-				// TODO: UVs are incorrect, v4->v3?
-
-				drawTriangle( _v1x, _v1y, _v2x, _v2y, _v4x, _v4y );
-				clipImage( _v1x, _v1y, _v2x, _v2y, _v4x, _v4y, 0, 0, 1, 0, 0, 1, _image );
-
-				drawTriangle( _v5x, _v5y, _v3x, _v3y, _v6x, _v6y );
-				clipImage( _v5x, _v5y, _v3x, _v3y, _v6x, _v6y, 1, 0, 1, 1, 0, 1, _image );
-
-			} else {
-
-				_color.copy( _ambientLight );
-
-				calculateLight( element.centroidModel, element.normalModel, _color );
-
-				_color.multiply( _diffuseColor ).add( _emissiveColor );
-
-				drawQuad( _v1x, _v1y, _v2x, _v2y, _v3x, _v3y, _v4x, _v4y );
-
-				material.wireframe === true
-					? strokePath( _color, material.wireframeLinewidth, material.wireframeLinecap, material.wireframeLinejoin )
-					: fillPath( _color );
-
-			}
-
-		} else if ( material instanceof THREE.MeshBasicMaterial ) {
-
-			_color.copy( material.color );
-
-			if ( material.vertexColors === THREE.FaceColors ) {
-
-				_color.multiply( element.color );
-
-			}
-
-			drawQuad( _v1x, _v1y, _v2x, _v2y, _v3x, _v3y, _v4x, _v4y );
-
-			material.wireframe === true
-				? strokePath( _color, material.wireframeLinewidth, material.wireframeLinecap, material.wireframeLinejoin )
-				: fillPath( _color );
-
-		} else if ( material instanceof THREE.MeshNormalMaterial ) {
-
-			var normal;
-
-			if ( material.shading == THREE.FlatShading ) {
-
-				normal = element.normalModelView;
-				_color.setRGB( normal.x, normal.y, normal.z ).multiplyScalar( 0.5 ).addScalar( 0.5 );
-
-				drawQuad( _v1x, _v1y, _v2x, _v2y, _v3x, _v3y, _v4x, _v4y );
-
-				material.wireframe === true
-					? strokePath( _color, material.wireframeLinewidth, material.wireframeLinecap, material.wireframeLinejoin )
-					: fillPath( _color );
-
-			} else if ( material.shading == THREE.SmoothShading ) {
-
-				normal = element.vertexNormalsModelView[ 0 ];
-				_color1.setRGB( normal.x, normal.y, normal.z ).multiplyScalar( 0.5 ).addScalar( 0.5 );
-
-				normal = element.vertexNormalsModelView[ 1 ];
-				_color2.setRGB( normal.x, normal.y, normal.z ).multiplyScalar( 0.5 ).addScalar( 0.5 );
-
-				normal = element.vertexNormalsModelView[ 3 ];
-				_color3.setRGB( normal.x, normal.y, normal.z ).multiplyScalar( 0.5 ).addScalar( 0.5 );
-
-				normal = element.vertexNormalsModelView[ 2 ];
-				_color4.setRGB( normal.x, normal.y, normal.z ).multiplyScalar( 0.5 ).addScalar( 0.5 );
-
-				_image = getGradientTexture( _color1, _color2, _color3, _color4 );
-
-				drawTriangle( _v1x, _v1y, _v2x, _v2y, _v4x, _v4y );
-				clipImage( _v1x, _v1y, _v2x, _v2y, _v4x, _v4y, 0, 0, 1, 0, 0, 1, _image );
-
-				drawTriangle( _v5x, _v5y, _v3x, _v3y, _v6x, _v6y );
-				clipImage( _v5x, _v5y, _v3x, _v3y, _v6x, _v6y, 1, 0, 1, 1, 0, 1, _image );
-
-			}
-
-		} else if ( material instanceof THREE.MeshDepthMaterial ) {
-
-			_near = _camera.near;
-			_far = _camera.far;
-
-			_color1.r = _color1.g = _color1.b = 1 - smoothstep( v1.positionScreen.z * v1.positionScreen.w, _near, _far );
-			_color2.r = _color2.g = _color2.b = 1 - smoothstep( v2.positionScreen.z * v2.positionScreen.w, _near, _far );
-			_color3.r = _color3.g = _color3.b = 1 - smoothstep( v4.positionScreen.z * v4.positionScreen.w, _near, _far );
-			_color4.r = _color4.g = _color4.b = 1 - smoothstep( v3.positionScreen.z * v3.positionScreen.w, _near, _far );
-
-			_image = getGradientTexture( _color1, _color2, _color3, _color4 );
-
-			// TODO: UVs are incorrect, v4->v3?
-
-			drawTriangle( _v1x, _v1y, _v2x, _v2y, _v4x, _v4y );
-			clipImage( _v1x, _v1y, _v2x, _v2y, _v4x, _v4y, 0, 0, 1, 0, 0, 1, _image );
-
-			drawTriangle( _v5x, _v5y, _v3x, _v3y, _v6x, _v6y );
-			clipImage( _v5x, _v5y, _v3x, _v3y, _v6x, _v6y, 1, 0, 1, 1, 0, 1, _image );
-
-		}
-
-	}
-
 	//
 
 	function drawTriangle( x0, y0, x1, y1, x2, y2 ) {
@@ -1000,17 +807,6 @@ THREE.CanvasRenderer = function ( parameters ) {
 		_context.moveTo( x0, y0 );
 		_context.lineTo( x1, y1 );
 		_context.lineTo( x2, y2 );
-		_context.closePath();
-
-	}
-
-	function drawQuad( x0, y0, x1, y1, x2, y2, x3, y3 ) {
-
-		_context.beginPath();
-		_context.moveTo( x0, y0 );
-		_context.lineTo( x1, y1 );
-		_context.lineTo( x2, y2 );
-		_context.lineTo( x3, y3 );
 		_context.closePath();
 
 	}
@@ -1035,32 +831,69 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 	}
 
+	function onTextureUpdate ( event ) {
+
+		textureToPattern( event.target );
+
+	}
+
+	function textureToPattern( texture ) {
+
+		var repeatX = texture.wrapS === THREE.RepeatWrapping;
+		var repeatY = texture.wrapT === THREE.RepeatWrapping;
+
+		var image = texture.image;
+
+		var canvas = document.createElement( 'canvas' );
+		canvas.width = image.width;
+		canvas.height = image.height;
+
+		var context = canvas.getContext( '2d' );
+		context.setTransform( 1, 0, 0, - 1, 0, image.height );
+		context.drawImage( image, 0, 0 );
+
+		_patterns[ texture.id ] = _context.createPattern(
+			canvas, repeatX === true && repeatY === true
+				? 'repeat'
+				: repeatX === true && repeatY === false
+					? 'repeat-x'
+					: repeatX === false && repeatY === true
+						? 'repeat-y'
+						: 'no-repeat'
+		);
+
+	}
+
 	function patternPath( x0, y0, x1, y1, x2, y2, u0, v0, u1, v1, u2, v2, texture ) {
 
-		if ( texture instanceof THREE.DataTexture || texture.image === undefined || texture.image.width == 0 ) return;
+		if ( texture instanceof THREE.DataTexture ) return;
 
-		if ( texture.needsUpdate === true ) {
+		if ( texture.hasEventListener( 'update', onTextureUpdate ) === false ) {
 
-			var repeatX = texture.wrapS == THREE.RepeatWrapping;
-			var repeatY = texture.wrapT == THREE.RepeatWrapping;
+			if ( texture.image !== undefined && texture.image.width > 0 ) {
 
-			_patterns[ texture.id ] = _context.createPattern(
-				texture.image, repeatX === true && repeatY === true
-					? 'repeat'
-					: repeatX === true && repeatY === false
-						? 'repeat-x'
-						: repeatX === false && repeatY === true
-							? 'repeat-y'
-							: 'no-repeat'
-			);
+				textureToPattern( texture );
 
-			texture.needsUpdate = false;
+			}
+
+			texture.addEventListener( 'update', onTextureUpdate );
 
 		}
 
-		_patterns[ texture.id ] === undefined
-			? setFillStyle( 'rgba(0,0,0,1)' )
-			: setFillStyle( _patterns[ texture.id ] );
+		var pattern = _patterns[ texture.id ];
+
+		if ( pattern !== undefined ) {
+
+			setFillStyle( pattern );
+
+		} else {
+
+			setFillStyle( 'rgba(0,0,0,1)' );
+			_context.fill();
+
+			return;
+
+		}	
 
 		// http://extremelysatisfactorytotalitarianism.com/blog/?p=2120
 
@@ -1071,13 +904,13 @@ THREE.CanvasRenderer = function ( parameters ) {
 		height = texture.image.height * texture.repeat.y;
 
 		u0 = ( u0 + offsetX ) * width;
-		v0 = ( 1.0 - v0 + offsetY ) * height;
+		v0 = ( v0 + offsetY ) * height;
 
 		u1 = ( u1 + offsetX ) * width;
-		v1 = ( 1.0 - v1 + offsetY ) * height;
+		v1 = ( v1 + offsetY ) * height;
 
 		u2 = ( u2 + offsetX ) * width;
-		v2 = ( 1.0 - v2 + offsetY ) * height;
+		v2 = ( v2 + offsetY ) * height;
 
 		x1 -= x0; y1 -= y0;
 		x2 -= x0; y2 -= y0;
@@ -1087,30 +920,7 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 		det = u1 * v2 - u2 * v1;
 
-		if ( det === 0 ) {
-
-			if ( _imagedatas[ texture.id ] === undefined ) {
-
-				var canvas = document.createElement( 'canvas' )
-				canvas.width = texture.image.width;
-				canvas.height = texture.image.height;
-
-				var context = canvas.getContext( '2d' );
-				context.drawImage( texture.image, 0, 0 );
-
-				_imagedatas[ texture.id ] = context.getImageData( 0, 0, texture.image.width, texture.image.height ).data;
-
-			}
-
-			var data = _imagedatas[ texture.id ];
-			var index = ( Math.floor( u0 ) + Math.floor( v0 ) * texture.image.width ) * 4;
-
-			_color.setRGB( data[ index ] / 255, data[ index + 1 ] / 255, data[ index + 2 ] / 255 );
-			fillPath( _color );
-
-			return;
-
-		}
+		if ( det === 0 ) return;
 
 		idet = 1 / det;
 

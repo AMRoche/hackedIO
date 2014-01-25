@@ -96,9 +96,9 @@ THREE.Color.prototype = {
 
 		// rgb(255,0,0)
 
-		if ( /^rgb\((\d+),(\d+),(\d+)\)$/i.test( style ) ) {
+		if ( /^rgb\((\d+), ?(\d+), ?(\d+)\)$/i.test( style ) ) {
 
-			var color = /^rgb\((\d+),(\d+),(\d+)\)$/i.exec( style );
+			var color = /^rgb\((\d+), ?(\d+), ?(\d+)\)$/i.exec( style );
 
 			this.r = Math.min( 255, parseInt( color[ 1 ], 10 ) ) / 255;
 			this.g = Math.min( 255, parseInt( color[ 2 ], 10 ) ) / 255;
@@ -110,9 +110,9 @@ THREE.Color.prototype = {
 
 		// rgb(100%,0%,0%)
 
-		if ( /^rgb\((\d+)\%,(\d+)\%,(\d+)\%\)$/i.test( style ) ) {
+		if ( /^rgb\((\d+)\%, ?(\d+)\%, ?(\d+)\%\)$/i.test( style ) ) {
 
-			var color = /^rgb\((\d+)\%,(\d+)\%,(\d+)\%\)$/i.exec( style );
+			var color = /^rgb\((\d+)\%, ?(\d+)\%, ?(\d+)\%\)$/i.exec( style );
 
 			this.r = Math.min( 100, parseInt( color[ 1 ], 10 ) ) / 100;
 			this.g = Math.min( 100, parseInt( color[ 2 ], 10 ) ) / 100;
@@ -223,54 +223,50 @@ THREE.Color.prototype = {
 
 	},
 
-	getHSL: function () {
+	getHSL: function ( optionalTarget ) {
 
-		var hsl = { h: 0, s: 0, l: 0 };
+		// h,s,l ranges are in 0.0 - 1.0
 
-		return function () {
+		var hsl = optionalTarget || { h: 0, s: 0, l: 0 };
 
-			// h,s,l ranges are in 0.0 - 1.0
+		var r = this.r, g = this.g, b = this.b;
 
-			var r = this.r, g = this.g, b = this.b;
+		var max = Math.max( r, g, b );
+		var min = Math.min( r, g, b );
 
-			var max = Math.max( r, g, b );
-			var min = Math.min( r, g, b );
+		var hue, saturation;
+		var lightness = ( min + max ) / 2.0;
 
-			var hue, saturation;
-			var lightness = ( min + max ) / 2.0;
+		if ( min === max ) {
 
-			if ( min === max ) {
+			hue = 0;
+			saturation = 0;
 
-				hue = 0;
-				saturation = 0;
+		} else {
 
-			} else {
+			var delta = max - min;
 
-				var delta = max - min;
+			saturation = lightness <= 0.5 ? delta / ( max + min ) : delta / ( 2 - max - min );
 
-				saturation = lightness <= 0.5 ? delta / ( max + min ) : delta / ( 2 - max - min );
+			switch ( max ) {
 
-				switch ( max ) {
-
-					case r: hue = ( g - b ) / delta + ( g < b ? 6 : 0 ); break;
-					case g: hue = ( b - r ) / delta + 2; break;
-					case b: hue = ( r - g ) / delta + 4; break;
-
-				}
-
-				hue /= 6;
+				case r: hue = ( g - b ) / delta + ( g < b ? 6 : 0 ); break;
+				case g: hue = ( b - r ) / delta + 2; break;
+				case b: hue = ( r - g ) / delta + 4; break;
 
 			}
 
-			hsl.h = hue;
-			hsl.s = saturation;
-			hsl.l = lightness;
+			hue /= 6;
 
-			return hsl;
+		}
 
-		};
+		hsl.h = hue;
+		hsl.s = saturation;
+		hsl.l = lightness;
 
-	}(),
+		return hsl;
+
+	},
 
 	getStyle: function () {
 
@@ -353,6 +349,22 @@ THREE.Color.prototype = {
 	equals: function ( c ) {
 
 		return ( c.r === this.r ) && ( c.g === this.g ) && ( c.b === this.b );
+
+	},
+
+	fromArray: function ( array ) {
+
+		this.r = array[ 0 ];
+		this.g = array[ 1 ];
+		this.b = array[ 2 ];
+
+		return this;
+
+	},
+
+	toArray: function () {
+
+		return [ this.r, this.g, this.b ];
 
 	},
 

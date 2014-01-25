@@ -484,9 +484,12 @@ THREE.Vector3.prototype = {
 
 	crossVectors: function ( a, b ) {
 
-		this.x = a.y * b.z - a.z * b.y;
-		this.y = a.z * b.x - a.x * b.z;
-		this.z = a.x * b.y - a.y * b.x;
+		var ax = a.x, ay = a.y, az = a.z;
+		var bx = b.x, by = b.y, bz = b.z;
+
+		this.x = ay * bz - az * by;
+		this.y = az * bx - ax * bz;
+		this.z = ax * by - ay * bx;
 
 		return this;
 
@@ -532,19 +535,42 @@ THREE.Vector3.prototype = {
 
 	getPositionFromMatrix: function ( m ) {
 
-		this.x = m.elements[12];
-		this.y = m.elements[13];
-		this.z = m.elements[14];
+		console.warn( "DEPRECATED: Vector3\'s .getPositionFromMatrix() has been renamed to .setFromMatrixPosition(). Please update your code." );
 
-		return this;
+		return this.setFromMatrixPosition( m );
 
 	},
 
 	getScaleFromMatrix: function ( m ) {
 
-		var sx = this.set( m.elements[0], m.elements[1], m.elements[2] ).length();
-		var sy = this.set( m.elements[4], m.elements[5], m.elements[6] ).length();
-		var sz = this.set( m.elements[8], m.elements[9], m.elements[10] ).length();
+		console.warn( "DEPRECATED: Vector3\'s .getScaleFromMatrix() has been renamed to .setFromMatrixScale(). Please update your code." );
+
+		return this.setFromMatrixScale( m );
+	},
+
+	getColumnFromMatrix: function ( index, matrix ) {
+
+		console.warn( "DEPRECATED: Vector3\'s .getColumnFromMatrix() has been renamed to .setFromMatrixColumn(). Please update your code." );
+
+		return this.setFromMatrixColumn( index, matrix );
+
+	},
+
+	setFromMatrixPosition: function ( m ) {
+
+		this.x = m.elements[ 12 ];
+		this.y = m.elements[ 13 ];
+		this.z = m.elements[ 14 ];
+
+		return this;
+
+	},
+
+	setFromMatrixScale: function ( m ) {
+
+		var sx = this.set( m.elements[ 0 ], m.elements[ 1 ], m.elements[  2 ] ).length();
+		var sy = this.set( m.elements[ 4 ], m.elements[ 5 ], m.elements[  6 ] ).length();
+		var sz = this.set( m.elements[ 8 ], m.elements[ 9 ], m.elements[ 10 ] ).length();
 
 		this.x = sx;
 		this.y = sy;
@@ -553,7 +579,7 @@ THREE.Vector3.prototype = {
 		return this;
 	},
 
-	getColumnFromMatrix: function ( index, matrix ) {
+	setFromMatrixColumn: function ( index, matrix ) {
 
 		var offset = index * 4;
 
@@ -601,17 +627,17 @@ THREE.extend( THREE.Vector3.prototype, {
 
 	applyEuler: function () {
 
-		var q1 = new THREE.Quaternion();
+		var quaternion = new THREE.Quaternion();
 
-		return function ( rotation ) {
+		return function ( euler ) {
 
-			if( typeof rotation['order'] === undefined ) {
+			if ( euler instanceof THREE.Euler === false ) {
+
 				console.error( 'ERROR: Vector3\'s .applyEuler() now expects a Euler rotation rather than a Vector3 and order.  Please update your code.' );
+
 			}
 
-			var quaternion = q1.setFromEuler( rotation );
-
-			this.applyQuaternion( quaternion );
+			this.applyQuaternion( quaternion.setFromEuler( euler ) );
 
 			return this;
 
@@ -621,13 +647,11 @@ THREE.extend( THREE.Vector3.prototype, {
 
 	applyAxisAngle: function () {
 
-		var q1 = new THREE.Quaternion();
+		var quaternion = new THREE.Quaternion();
 
 		return function ( axis, angle ) {
 
-			var quaternion = q1.setFromAxisAngle( axis, angle );
-
-			this.applyQuaternion( quaternion );
+			this.applyQuaternion( quaternion.setFromAxisAngle( axis, angle ) );
 
 			return this;
 

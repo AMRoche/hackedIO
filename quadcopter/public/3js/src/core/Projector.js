@@ -9,11 +9,14 @@ THREE.Projector = function () {
 	var _object, _objectCount, _objectPool = [], _objectPoolLength = 0,
 	_vertex, _vertexCount, _vertexPool = [], _vertexPoolLength = 0,
 	_face, _face3Count, _face3Pool = [], _face3PoolLength = 0,
-	_face4Count, _face4Pool = [], _face4PoolLength = 0,
 	_line, _lineCount, _linePool = [], _linePoolLength = 0,
-	_particle, _particleCount, _particlePool = [], _particlePoolLength = 0,
+	_sprite, _spriteCount, _spritePool = [], _spritePoolLength = 0,
 
 	_renderData = { objects: [], sprites: [], lights: [], elements: [] },
+
+	_vA = new THREE.Vector3(),
+	_vB = new THREE.Vector3(),
+	_vC = new THREE.Vector3(),
 
 	_vector3 = new THREE.Vector3(),
 	_vector4 = new THREE.Vector4(),
@@ -49,15 +52,20 @@ THREE.Projector = function () {
 
 	};
 
-	this.unprojectVector = function ( vector, camera ) {
+	this.unprojectVector = function () {
 
-		camera.projectionMatrixInverse.getInverse( camera.projectionMatrix );
+		var projectionMatrixInverse = new THREE.Matrix4();
 
-		_viewProjectionMatrix.multiplyMatrices( camera.matrixWorld, camera.projectionMatrixInverse );
+		return function ( vector, camera ) {
 
-		return vector.applyProjection( _viewProjectionMatrix );
+			projectionMatrixInverse.getInverse( camera.projectionMatrix );
+			_viewProjectionMatrix.multiplyMatrices( camera.matrixWorld, projectionMatrixInverse );
 
-	};
+			return vector.applyProjection( _viewProjectionMatrix );
+
+		};
+
+	}();
 
 	this.pickingRay = function ( vector, camera ) {
 
@@ -87,13 +95,34 @@ THREE.Projector = function () {
 
 		} else {
 
-			_vector3.getPositionFromMatrix( object.matrixWorld );
+			_vector3.setFromMatrixPosition( object.matrixWorld );
 			_vector3.applyProjection( _viewProjectionMatrix );
 			_object.z = _vector3.z;
 
 		}
 
 		return _object;
+
+	};
+
+	var projectVertex = function ( vertex ) {
+
+		var position = vertex.position;
+		var positionWorld = vertex.positionWorld;
+		var positionScreen = vertex.positionScreen;
+
+		positionWorld.copy( position ).applyMatrix4( _modelMatrix );
+		positionScreen.copy( positionWorld ).applyMatrix4( _viewProjectionMatrix );
+
+		var invW = 1 / positionScreen.w;
+
+		positionScreen.x *= invW;
+		positionScreen.y *= invW;
+		positionScreen.z *= invW;
+
+		vertex.visible = positionScreen.x >= -1 && positionScreen.x <= 1 &&
+				 positionScreen.y >= -1 && positionScreen.y <= 1 &&
+				 positionScreen.z >= -1 && positionScreen.z <= 1;
 
 	};
 
@@ -113,7 +142,7 @@ THREE.Projector = function () {
 
 			}
 
-		} else if ( object instanceof THREE.Sprite || object instanceof THREE.Particle ) {
+		} else if ( object instanceof THREE.Sprite ) {
 
 			_renderData.sprites.push( getObject( object ) );
 
@@ -148,14 +177,12 @@ THREE.Projector = function () {
 	this.projectScene = function ( scene, camera, sortObjects, sortElements ) {
 
 		var visible = false,
-		o, ol, v, vl, f, fl, n, nl, c, cl, u, ul, object,
-		geometry, vertices, faces, face, faceVertexNormals, faceVertexUvs, uvs,
+		object, geometry, vertices, faces, face, faceVertexNormals, faceVertexUvs, uvs,
 		v1, v2, v3, v4, isFaceMaterial, objectMaterials;
 
 		_face3Count = 0;
-		_face4Count = 0;
 		_lineCount = 0;
-		_particleCount = 0;
+		_spriteCount = 0;
 
 		_renderData.elements.length = 0;
 
@@ -171,7 +198,7 @@ THREE.Projector = function () {
 
 		projectGraph( scene, sortObjects );
 
-		for ( o = 0, ol = _renderData.objects.length; o < ol; o ++ ) {
+		for ( var o = 0, ol = _renderData.objects.length; o < ol; o ++ ) {
 
 			object = _renderData.objects[ o ].object;
 
@@ -192,26 +219,16 @@ THREE.Projector = function () {
 				isFaceMaterial = object.material instanceof THREE.MeshFaceMaterial;
 				objectMaterials = isFaceMaterial === true ? object.material : null;
 
-				for ( v = 0, vl = vertices.length; v < vl; v ++ ) {
+				for ( var v = 0, vl = vertices.length; v < vl; v ++ ) {
 
 					_vertex = getNextVertexInPool();
+					_vertex.position.copy( vertices[ v ] );
 
-					_vertex.positionWorld.copy( vertices[ v ] ).applyMatrix4( _modelMatrix );
-					_vertex.positionScreen.copy( _vertex.positionWorld ).applyMatrix4( _viewProjectionMatrix );
-
-					var invW = 1 / _vertex.positionScreen.w;
-
-					_vertex.positionScreen.x *= invW;
-					_vertex.positionScreen.y *= invW;
-					_vertex.positionScreen.z *= invW;
-
-					_vertex.visible = ! ( _vertex.positionScreen.x < -1 || _vertex.positionScreen.x > 1 ||
-							      _vertex.positionScreen.y < -1 || _vertex.positionScreen.y > 1 ||
-							      _vertex.positionScreen.z < -1 || _vertex.positionScreen.z > 1 );
+					projectVertex( _vertex );
 
 				}
 
-				for ( f = 0, fl = faces.length; f < fl; f ++ ) {
+				for ( var f = 0, fl = faces.length; f < fl; f ++ ) {
 
 					face = faces[ f ];
 
@@ -223,36 +240,75 @@ THREE.Projector = function () {
 
 					var side = material.side;
 
-					if ( face instanceof THREE.Face3 ) {
+					v1 = _vertexPool[ face.a ];
+					v2 = _vertexPool[ face.b ];
+					v3 = _vertexPool[ face.c ];
 
-						v1 = _vertexPool[ face.a ];
-						v2 = _vertexPool[ face.b ];
-						v3 = _vertexPool[ face.c ];
+					if ( material.morphTargets === true ) {
 
-						_points3[ 0 ] = v1.positionScreen;
-						_points3[ 1 ] = v2.positionScreen;
-						_points3[ 2 ] = v3.positionScreen;
+						var morphTargets = geometry.morphTargets;
+						var morphInfluences = object.morphTargetInfluences;
 
-						if ( v1.visible === true || v2.visible === true || v3.visible === true ||
-							_clipBox.isIntersectionBox( _boundingBox.setFromPoints( _points3 ) ) ) {
+						var v1p = v1.position;
+						var v2p = v2.position;
+						var v3p = v3.position;
 
-							visible = ( ( v3.positionScreen.x - v1.positionScreen.x ) * ( v2.positionScreen.y - v1.positionScreen.y ) -
-								( v3.positionScreen.y - v1.positionScreen.y ) * ( v2.positionScreen.x - v1.positionScreen.x ) ) < 0;
+						_vA.set( 0, 0, 0 );
+						_vB.set( 0, 0, 0 );
+						_vC.set( 0, 0, 0 );
 
-							if ( side === THREE.DoubleSide || visible === ( side === THREE.FrontSide ) ) {
+						for ( var t = 0, tl = morphTargets.length; t < tl; t ++ ) {
 
-								_face = getNextFace3InPool();
+							var influence = morphInfluences[ t ];
 
-								_face.id = object.id;
-								_face.v1.copy( v1 );
-								_face.v2.copy( v2 );
-								_face.v3.copy( v3 );
+							if ( influence === 0 ) continue;
 
-							} else {
+							var targets = morphTargets[ t ].vertices;
 
-								continue;
+							_vA.x += ( targets[ face.a ].x - v1p.x ) * influence;
+							_vA.y += ( targets[ face.a ].y - v1p.y ) * influence;
+							_vA.z += ( targets[ face.a ].z - v1p.z ) * influence;
 
-							}
+							_vB.x += ( targets[ face.b ].x - v2p.x ) * influence;
+							_vB.y += ( targets[ face.b ].y - v2p.y ) * influence;
+							_vB.z += ( targets[ face.b ].z - v2p.z ) * influence;
+
+							_vC.x += ( targets[ face.c ].x - v3p.x ) * influence;
+							_vC.y += ( targets[ face.c ].y - v3p.y ) * influence;
+							_vC.z += ( targets[ face.c ].z - v3p.z ) * influence;
+
+						}
+
+						v1.position.add( _vA );
+						v2.position.add( _vB );
+						v3.position.add( _vC );
+
+						projectVertex( v1 );
+						projectVertex( v2 );
+						projectVertex( v3 );
+
+					}
+
+					_points3[ 0 ] = v1.positionScreen;
+					_points3[ 1 ] = v2.positionScreen;
+					_points3[ 2 ] = v3.positionScreen;
+
+					if ( v1.visible === true || v2.visible === true || v3.visible === true ||
+						_clipBox.isIntersectionBox( _boundingBox.setFromPoints( _points3 ) ) ) {
+
+						visible = ( ( v3.positionScreen.x - v1.positionScreen.x ) *
+							    ( v2.positionScreen.y - v1.positionScreen.y ) -
+							    ( v3.positionScreen.y - v1.positionScreen.y ) *
+							    ( v2.positionScreen.x - v1.positionScreen.x ) ) < 0;
+
+						if ( side === THREE.DoubleSide || visible === ( side === THREE.FrontSide ) ) {
+
+							_face = getNextFace3InPool();
+
+							_face.id = object.id;
+							_face.v1.copy( v1 );
+							_face.v2.copy( v2 );
+							_face.v3.copy( v3 );
 
 						} else {
 
@@ -260,48 +316,9 @@ THREE.Projector = function () {
 
 						}
 
-					} else if ( face instanceof THREE.Face4 ) {
+					} else {
 
-						v1 = _vertexPool[ face.a ];
-						v2 = _vertexPool[ face.b ];
-						v3 = _vertexPool[ face.c ];
-						v4 = _vertexPool[ face.d ];
-
-						_points4[ 0 ] = v1.positionScreen;
-						_points4[ 1 ] = v2.positionScreen;
-						_points4[ 2 ] = v3.positionScreen;
-						_points4[ 3 ] = v4.positionScreen;
-
-						if ( v1.visible === true || v2.visible === true || v3.visible === true || v4.visible === true ||
-							_clipBox.isIntersectionBox( _boundingBox.setFromPoints( _points4 ) ) ) {
-
-							visible = ( v4.positionScreen.x - v1.positionScreen.x ) * ( v2.positionScreen.y - v1.positionScreen.y ) -
-								( v4.positionScreen.y - v1.positionScreen.y ) * ( v2.positionScreen.x - v1.positionScreen.x ) < 0 ||
-								( v2.positionScreen.x - v3.positionScreen.x ) * ( v4.positionScreen.y - v3.positionScreen.y ) -
-								( v2.positionScreen.y - v3.positionScreen.y ) * ( v4.positionScreen.x - v3.positionScreen.x ) < 0;
-
-
-							if ( side === THREE.DoubleSide || visible === ( side === THREE.FrontSide ) ) {
-
-								_face = getNextFace4InPool();
-
-								_face.id = object.id;
-								_face.v1.copy( v1 );
-								_face.v2.copy( v2 );
-								_face.v3.copy( v3 );
-								_face.v4.copy( v4 );
-
-							} else {
-
-								continue;
-
-							}
-
-						} else {
-
-							continue;
-
-						}
+						continue;
 
 					}
 
@@ -321,7 +338,7 @@ THREE.Projector = function () {
 
 					faceVertexNormals = face.vertexNormals;
 
-					for ( n = 0, nl = faceVertexNormals.length; n < nl; n ++ ) {
+					for ( var n = 0, nl = Math.min( faceVertexNormals.length, 3 ); n < nl; n ++ ) {
 
 						var normalModel = _face.vertexNormalsModel[ n ];
 						normalModel.copy( faceVertexNormals[ n ] );
@@ -341,13 +358,13 @@ THREE.Projector = function () {
 
 					_face.vertexNormalsLength = faceVertexNormals.length;
 
-					for ( c = 0, cl = faceVertexUvs.length; c < cl; c ++ ) {
+					for ( var c = 0, cl = Math.min( faceVertexUvs.length, 3 ); c < cl; c ++ ) {
 
 						uvs = faceVertexUvs[ c ][ f ];
 
 						if ( uvs === undefined ) continue;
 
-						for ( u = 0, ul = uvs.length; u < ul; u ++ ) {
+						for ( var u = 0, ul = uvs.length; u < ul; u ++ ) {
 
 							_face.uvs[ c ][ u ] = uvs[ u ];
 
@@ -429,34 +446,30 @@ THREE.Projector = function () {
 
 			_modelMatrix = object.matrixWorld;
 
-			if ( object instanceof THREE.Particle ) {
+			_vector4.set( _modelMatrix.elements[12], _modelMatrix.elements[13], _modelMatrix.elements[14], 1 );
+			_vector4.applyMatrix4( _viewProjectionMatrix );
 
-				_vector4.set( _modelMatrix.elements[12], _modelMatrix.elements[13], _modelMatrix.elements[14], 1 );
-				_vector4.applyMatrix4( _viewProjectionMatrix );
+			var invW = 1 / _vector4.w;
 
-				var invW = 1 / _vector4.w;
+			_vector4.z *= invW;
 
-				_vector4.z *= invW;
+			if ( _vector4.z >= -1 && _vector4.z <= 1 ) {
 
-				if ( _vector4.z > 0 && _vector4.z < 1 ) {
+				_sprite = getNextSpriteInPool();
+				_sprite.id = object.id;
+				_sprite.x = _vector4.x * invW;
+				_sprite.y = _vector4.y * invW;
+				_sprite.z = _vector4.z;
+				_sprite.object = object;
 
-					_particle = getNextParticleInPool();
-					_particle.id = object.id;
-					_particle.x = _vector4.x * invW;
-					_particle.y = _vector4.y * invW;
-					_particle.z = _vector4.z;
-					_particle.object = object;
+				_sprite.rotation = object.rotation;
 
-					_particle.rotation = object.rotation.z;
+				_sprite.scale.x = object.scale.x * Math.abs( _sprite.x - ( _vector4.x + camera.projectionMatrix.elements[0] ) / ( _vector4.w + camera.projectionMatrix.elements[12] ) );
+				_sprite.scale.y = object.scale.y * Math.abs( _sprite.y - ( _vector4.y + camera.projectionMatrix.elements[5] ) / ( _vector4.w + camera.projectionMatrix.elements[13] ) );
 
-					_particle.scale.x = object.scale.x * Math.abs( _particle.x - ( _vector4.x + camera.projectionMatrix.elements[0] ) / ( _vector4.w + camera.projectionMatrix.elements[12] ) );
-					_particle.scale.y = object.scale.y * Math.abs( _particle.y - ( _vector4.y + camera.projectionMatrix.elements[5] ) / ( _vector4.w + camera.projectionMatrix.elements[13] ) );
+				_sprite.material = object.material;
 
-					_particle.material = object.material;
-
-					_renderData.elements.push( _particle );
-
-				}
+				_renderData.elements.push( _sprite );
 
 			}
 
@@ -519,22 +532,6 @@ THREE.Projector = function () {
 
 	}
 
-	function getNextFace4InPool() {
-
-		if ( _face4Count === _face4PoolLength ) {
-
-			var face = new THREE.RenderableFace4();
-			_face4Pool.push( face );
-			_face4PoolLength ++;
-			_face4Count ++;
-			return face;
-
-		}
-
-		return _face4Pool[ _face4Count ++ ];
-
-	}
-
 	function getNextLineInPool() {
 
 		if ( _lineCount === _linePoolLength ) {
@@ -551,19 +548,19 @@ THREE.Projector = function () {
 
 	}
 
-	function getNextParticleInPool() {
+	function getNextSpriteInPool() {
 
-		if ( _particleCount === _particlePoolLength ) {
+		if ( _spriteCount === _spritePoolLength ) {
 
-			var particle = new THREE.RenderableParticle();
-			_particlePool.push( particle );
-			_particlePoolLength ++;
-			_particleCount ++
-			return particle;
+			var sprite = new THREE.RenderableSprite();
+			_spritePool.push( sprite );
+			_spritePoolLength ++;
+			_spriteCount ++
+			return sprite;
 
 		}
 
-		return _particlePool[ _particleCount ++ ];
+		return _spritePool[ _spriteCount ++ ];
 
 	}
 

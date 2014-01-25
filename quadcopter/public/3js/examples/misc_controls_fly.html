@@ -81,10 +81,6 @@
 
 			var clock = new THREE.Clock();
 
-			init();
-			animate();
-
-			function init() {
 
 				container = document.createElement( 'div' );
 				document.body.appendChild( container );
@@ -130,11 +126,11 @@
 				uniforms[ "enableDiffuse" ].value = true;
 				uniforms[ "enableSpecular" ].value = true;
 
-				uniforms[ "uDiffuseColor" ].value.setHex( 0xffffff );
-				uniforms[ "uSpecularColor" ].value.setHex( 0x333333 );
-				uniforms[ "uAmbientColor" ].value.setHex( 0x000000 );
+				uniforms[ "diffuse" ].value.setHex( 0xffffff );
+				uniforms[ "specular" ].value.setHex( 0x333333 );
+				uniforms[ "ambient" ].value.setHex( 0x000000 );
 
-				uniforms[ "uShininess" ].value = 15;
+				uniforms[ "shininess" ].value = 15;
 
 				var parameters = {
 
@@ -206,12 +202,12 @@
 
 				var stars;
 				var starsMaterials = [
-					new THREE.ParticleBasicMaterial( { color: 0x555555, size: 2, sizeAttenuation: false } ),
-					new THREE.ParticleBasicMaterial( { color: 0x555555, size: 1, sizeAttenuation: false } ),
-					new THREE.ParticleBasicMaterial( { color: 0x333333, size: 2, sizeAttenuation: false } ),
-					new THREE.ParticleBasicMaterial( { color: 0x3a3a3a, size: 1, sizeAttenuation: false } ),
-					new THREE.ParticleBasicMaterial( { color: 0x1a1a1a, size: 2, sizeAttenuation: false } ),
-					new THREE.ParticleBasicMaterial( { color: 0x1a1a1a, size: 1, sizeAttenuation: false } )
+					new THREE.ParticleSystemMaterial( { color: 0x555555, size: 2, sizeAttenuation: false } ),
+					new THREE.ParticleSystemMaterial( { color: 0x555555, size: 1, sizeAttenuation: false } ),
+					new THREE.ParticleSystemMaterial( { color: 0x333333, size: 2, sizeAttenuation: false } ),
+					new THREE.ParticleSystemMaterial( { color: 0x3a3a3a, size: 1, sizeAttenuation: false } ),
+					new THREE.ParticleSystemMaterial( { color: 0x1a1a1a, size: 2, sizeAttenuation: false } ),
+					new THREE.ParticleSystemMaterial( { color: 0x1a1a1a, size: 1, sizeAttenuation: false } )
 				];
 
 				for ( i = 10; i < 30; i ++ ) {
@@ -232,7 +228,7 @@
 
 				}
 
-				renderer = new THREE.WebGLRenderer( { clearColor: 0x000000, clearAlpha: 1 } );
+				renderer = new THREE.WebGLRenderer();
 				renderer.setSize( SCREEN_WIDTH, SCREEN_HEIGHT );
 				renderer.sortObjects = false;
 
@@ -260,7 +256,10 @@
 				composer.addPass( renderModel );
 				composer.addPass( effectFilm );
 
-			};
+
+
+			animate();
+
 
 			function onWindowResize( event ) {
 
@@ -280,17 +279,8 @@
 
 				requestAnimationFrame( animate );
 
-				render();
-				stats.update();
-
-			};
-
-			function render() {
-
-				// rotate the planet and clouds
-
-				var delta = clock.getDelta();
-
+var delta = clock.getDelta();
+				console.log(delta);
 				meshPlanet.rotation.y += rotationSpeed * delta;
 				meshClouds.rotation.y += 1.25 * rotationSpeed * delta;
 
@@ -317,7 +307,10 @@
 				renderer.clear();
 				composer.render( delta );
 
+				stats.update();
+
 			};
+
 
 		</script>
 	</body>

@@ -48,7 +48,8 @@ THREE.ObjectLoader.prototype = {
 
 		if ( json !== undefined ) {
 
-			var loader = new THREE.JSONLoader();
+			var geometryLoader = new THREE.JSONLoader();
+			var bufferGeometryLoader = new THREE.BufferGeometryLoader();
 
 			for ( var i = 0, l = json.length; i < l; i ++ ) {
 
@@ -64,6 +65,15 @@ THREE.ObjectLoader.prototype = {
 							data.height,
 							data.widthSegments,
 							data.heightSegments
+						);
+
+						break;
+
+					case 'CircleGeometry':
+
+						geometry = new THREE.CircleGeometry(
+							data.radius,
+							data.segments
 						);
 
 						break;
@@ -87,7 +97,7 @@ THREE.ObjectLoader.prototype = {
 							data.radiusTop,
 							data.radiusBottom,
 							data.height,
-							data.radiusSegments,
+							data.radialSegments,
 							data.heightSegments,
 							data.openEnded
 						);
@@ -143,9 +153,15 @@ THREE.ObjectLoader.prototype = {
 
 						break;
 
+					case 'BufferGeometry':
+
+						geometry = bufferGeometryLoader.parse( data.data );
+
+						break;
+
 					case 'Geometry':
 
-						geometry = loader.parse( data.data ).geometry;
+						geometry = geometryLoader.parse( data.data ).geometry;
 
 						break;
 
@@ -268,6 +284,20 @@ THREE.ObjectLoader.prototype = {
 					}
 
 					object = new THREE.Mesh( geometry, material );
+
+					break;
+
+				case 'Sprite':
+
+					var material = materials[ data.material ];
+
+					if ( material === undefined ) {
+
+						console.error( 'THREE.ObjectLoader: Undefined material ' + data.material );
+
+					}
+
+					object = new THREE.Sprite( material );
 
 					break;
 

@@ -2,12 +2,9 @@ Menubar.Edit = function ( editor ) {
 
 	var container = new UI.Panel();
 	container.setClass( 'menu' );
-	container.onMouseOver( function () { options.setDisplay( 'block' ) } );
-	container.onMouseOut( function () { options.setDisplay( 'none' ) } );
-	container.onClick( function () { options.setDisplay( 'block' ) } );
 
 	var title = new UI.Panel();
-	title.setTextContent( 'Edit' ).setColor( '#666' );
+	title.setTextContent( 'Edit' );
 	title.setMargin( '0px' );
 	title.setPadding( '8px' );
 	container.add( title );
@@ -16,7 +13,6 @@ Menubar.Edit = function ( editor ) {
 
 	var options = new UI.Panel();
 	options.setClass( 'options' );
-	options.setDisplay( 'none' );
 	container.add( options );
 
 	// clone
@@ -34,6 +30,47 @@ Menubar.Edit = function ( editor ) {
 
 		editor.addObject( object );
 		editor.select( object );
+
+	} );
+	options.add( option );
+
+	// delete
+
+	var option = new UI.Panel();
+	option.setClass( 'option' );
+	option.setTextContent( 'Delete' );
+	option.onClick( function () {
+
+		editor.removeObject( editor.selected );
+		editor.deselect();
+
+	} );
+	options.add( option );
+
+	options.add( new UI.HorizontalRule() );
+
+	// convert to BufferGeometry
+
+	var option = new UI.Panel();
+	option.setClass( 'option' );
+	option.setTextContent( 'Convert' );
+	option.onClick( function () {
+
+		var object = editor.selected;
+
+		if ( object.geometry instanceof THREE.Geometry ) {
+
+			if ( object.parent === undefined ) return; // avoid flattening the camera or scene
+
+			if ( confirm( 'Convert ' + object.name + ' to BufferGeometry?' ) === false ) return;
+
+			delete object.__webglInit; // TODO: Remove hack (WebGLRenderer refactoring)
+
+			object.geometry = THREE.BufferGeometryUtils.fromGeometry( object.geometry );
+
+			editor.signals.objectChanged.dispatch( object );
+
+		}
 
 	} );
 	options.add( option );
@@ -67,18 +104,6 @@ Menubar.Edit = function ( editor ) {
 	} );
 	options.add( option );
 
-	// delete
-
-	var option = new UI.Panel();
-	option.setClass( 'option' );
-	option.setTextContent( 'Delete' );
-	option.onClick( function () {
-
-		editor.removeObject( editor.selected );
-		editor.deselect();
-
-	} );
-	options.add( option );
 
 	//
 

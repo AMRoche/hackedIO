@@ -2,12 +2,9 @@ Menubar.File = function ( editor ) {
 
 	var container = new UI.Panel();
 	container.setClass( 'menu' );
-	container.onMouseOver( function () { options.setDisplay( 'block' ) } );
-	container.onMouseOut( function () { options.setDisplay( 'none' ) } );
-	container.onClick( function () { options.setDisplay( 'block' ) } );
 
 	var title = new UI.Panel();
-	title.setTextContent( 'File' ).setColor( '#666' );
+	title.setTextContent( 'File' );
 	title.setMargin( '0px' );
 	title.setPadding( '8px' );
 	container.add( title );
@@ -16,7 +13,6 @@ Menubar.File = function ( editor ) {
 
 	var options = new UI.Panel();
 	options.setClass( 'options' );
-	options.setDisplay( 'none' );
 	container.add( options );
 
 	// new
@@ -28,13 +24,12 @@ Menubar.File = function ( editor ) {
 
 		if ( confirm( 'Are you sure?' ) ) {
 
-			if ( localStorage.threejsEditor !== undefined ) {
+			editor.config.clear();
+			editor.storage.clear( function () {
 
-				delete localStorage.threejsEditor;
+				location.href = location.pathname;
 
-			}
-
-			location.href = location.pathname;
+			} );
 
 		}
 
@@ -74,26 +69,36 @@ Menubar.File = function ( editor ) {
 	option.setTextContent( 'Export Geometry' );
 	option.onClick( function () {
 
-		exportGeometry( THREE.GeometryExporter );
+		var object = editor.selected;
+
+		if ( object === null ) {
+
+			alert( 'No object selected.' );
+			return;
+
+		}
+
+		var geometry = object.geometry;
+
+		if ( geometry === undefined ) {
+
+			alert( 'The selected object doesn\'t have geometry.' );
+			return;
+
+		}
+
+		if ( geometry instanceof THREE.BufferGeometry ) {
+
+			exportGeometry( THREE.BufferGeometryExporter );
+
+		} else if ( geometry instanceof THREE.Geometry ) {
+
+			exportGeometry( THREE.GeometryExporter );
+
+		}
 
 	} );
 	options.add( option );
-
-	/*
-
-	// export scene
-
-	var option = new UI.Panel();
-	option.setClass( 'option' );
-	option.setTextContent( 'Export Scene' );
-	option.onClick( function () {
-
-		exportScene( THREE.SceneExporter );
-
-	} );
-	options.add( option );
-
-	*/
 
 	// export object
 
@@ -101,6 +106,13 @@ Menubar.File = function ( editor ) {
 	option.setClass( 'option' );
 	option.setTextContent( 'Export Object' );
 	option.onClick( function () {
+
+		if ( editor.selected === null ) {
+
+			alert( 'No object selected' );
+			return;
+
+		}
 
 		exportObject( THREE.ObjectExporter );
 
@@ -134,19 +146,12 @@ Menubar.File = function ( editor ) {
 	var exportGeometry = function ( exporterClass ) {
 
 		var object = editor.selected;
-
-		if ( object.geometry === undefined ) {
-
-			alert( "Selected object doesn't have any geometry" );
-			return;
-
-		}
-
 		var exporter = new exporterClass();
 
 		var output;
 
-		if ( exporter instanceof THREE.GeometryExporter ) {
+		if ( exporter instanceof THREE.BufferGeometryExporter ||
+		     exporter instanceof THREE.GeometryExporter ) {
 
 			output = JSON.stringify( exporter.parse( object.geometry ), null, '\t' );
 			output = output.replace( /[\n\t]+([\d\.e\-\[\]]+)/g, '$1' );
@@ -167,9 +172,8 @@ Menubar.File = function ( editor ) {
 
 	var exportObject = function ( exporterClass ) {
 
-		var exporter = new exporterClass();
-
 		var object = editor.selected;
+		var exporter = new exporterClass();
 
 		var output = JSON.stringify( exporter.parse( object ), null, '\t' );
 		output = output.replace( /[\n\t]+([\d\.e\-\[\]]+)/g, '$1' );
@@ -196,24 +200,6 @@ Menubar.File = function ( editor ) {
 		window.focus();
 
 	};
-
-	options.add( new UI.HorizontalRule() );
-
-
-	// share
-
-	var option = new UI.Panel();
-	option.setClass( 'option' );
-	option.setTextContent( 'Share' );
-	option.onClick( function () {
-
-		var exporter = new THREE.ObjectExporter();
-		var string = JSON.stringify( exporter.parse( editor.scene ) );
-		window.location.hash = 'A/' + window.btoa( RawDeflate.deflate( string ) );
-
-	} );
-	options.add( option );
-
 
 	return container;
 

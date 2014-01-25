@@ -3,59 +3,30 @@ var Loader = function ( editor ) {
 	var scope = this;
 	var signals = editor.signals;
 
-	document.addEventListener( 'dragover', function ( event ) {
-
-		event.preventDefault();
-		event.dataTransfer.dropEffect = 'copy';
-
-	}, false );
-
-	document.addEventListener( 'drop', function ( event ) {
-
-		event.preventDefault();
-		scope.loadFile( event.dataTransfer.files[ 0 ] );
-
-	}, false );
-
-	this.loadLocalStorage = function () {
-
-		if ( localStorage.threejsEditor !== undefined ) {
-
-			var loader = new THREE.ObjectLoader();
-			var scene = loader.parse( JSON.parse( localStorage.threejsEditor ) );
-
-			editor.setScene( scene );
-
-		}
-
-	};
-
-	var exporter = new THREE.ObjectExporter();
-	var timeout;
-
-	this.saveLocalStorage = function ( scene ) {
-
-		clearTimeout( timeout );
-
-		timeout = setTimeout( function () {
-
-			localStorage.threejsEditor = JSON.stringify( exporter.parse( editor.scene ) );
-			console.log( '[' + /\d\d\:\d\d\:\d\d/.exec( new Date() )[ 0 ] + ']', 'Saved state to LocalStorage.' );
-
-		}, 3000 );
-
-	};
-
-	signals.objectAdded.add( this.saveLocalStorage );
-	signals.objectChanged.add( this.saveLocalStorage );
-	signals.objectRemoved.add( this.saveLocalStorage );
-
 	this.loadFile = function ( file ) {
 
 		var filename = file.name;
 		var extension = filename.split( '.' ).pop().toLowerCase();
 
 		switch ( extension ) {
+
+			case 'babylon':
+
+				var reader = new FileReader();
+				reader.addEventListener( 'load', function ( event ) {
+
+					var contents = event.target.result;
+					var json = JSON.parse( contents );
+
+					var loader = new THREE.BabylonLoader();
+					var scene = loader.parse( json );
+
+					editor.setScene( scene );
+
+				}, false );
+				reader.readAsText( file );
+
+				break;
 
 			case 'ctm':
 
@@ -316,13 +287,13 @@ var Loader = function ( editor ) {
 
 		if ( data.metadata === undefined ) { // 2.0
 
-			data.metadata = { type: 'geometry' };
+			data.metadata = { type: 'Geometry' };
 
 		}
 
 		if ( data.metadata.type === undefined ) { // 3.0
 
-			data.metadata.type = 'geometry';
+			data.metadata.type = 'Geometry';
 
 		}
 
@@ -332,7 +303,7 @@ var Loader = function ( editor ) {
 
 		}
 
-		if ( data.metadata.type === 'geometry' ) {
+		if ( data.metadata.type.toLowerCase() === 'geometry' ) {
 
 			var loader = new THREE.JSONLoader();
 			var result = loader.parse( data );
@@ -350,7 +321,7 @@ var Loader = function ( editor ) {
 
 			editor.addObject( mesh );
 
-		} else if ( data.metadata.type === 'object' ) {
+		} else if ( data.metadata.type.toLowerCase() === 'object' ) {
 
 			var loader = new THREE.ObjectLoader();
 			var result = loader.parse( data );
@@ -365,7 +336,7 @@ var Loader = function ( editor ) {
 
 			}
 
-		} else if ( data.metadata.type === 'scene' ) {
+		} else if ( data.metadata.type.toLowerCase() === 'scene' ) {
 
 			// DEPRECATED
 

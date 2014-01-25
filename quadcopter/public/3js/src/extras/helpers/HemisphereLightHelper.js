@@ -35,6 +35,11 @@ THREE.HemisphereLightHelper = function ( light, sphereSize, arrowLength, domeSiz
 
 THREE.HemisphereLightHelper.prototype = Object.create( THREE.Object3D.prototype );
 
+THREE.HemisphereLightHelper.prototype.dispose = function () {
+	this.lightSphere.geometry.dispose();
+	this.lightSphere.material.dispose();
+};
+
 THREE.HemisphereLightHelper.prototype.update = function () {
 
 	var vector = new THREE.Vector3();
@@ -44,7 +49,7 @@ THREE.HemisphereLightHelper.prototype.update = function () {
 		this.colors[ 0 ].copy( this.light.color ).multiplyScalar( this.light.intensity );
 		this.colors[ 1 ].copy( this.light.groundColor ).multiplyScalar( this.light.intensity );
 
-		this.lightSphere.lookAt( vector.getPositionFromMatrix( this.light.matrixWorld ).negate() );
+		this.lightSphere.lookAt( vector.setFromMatrixPosition( this.light.matrixWorld ).negate() );
 		this.lightSphere.geometry.colorsNeedUpdate = true;
 
 	}

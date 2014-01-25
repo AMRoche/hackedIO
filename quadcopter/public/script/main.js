@@ -1,3 +1,4 @@
+"use strict";
 var scene = new THREE.Scene();
 var camera = new THREE.PerspectiveCamera(55, 16 / 9, 0.1, 1000);
 var cubes = [];
@@ -14,11 +15,26 @@ utils.getById("targeting").style.display = "block";
 var timestamp = new Date().getTime();
 var vel = [0, 0, 0];
 //x,y,z
+
+camera.position = {
+	x : utils.cubeSize / 2,
+	y : 0,
+	z : utils.cubeSize / 2
+};
+
 var yaw, pitch, roll;
 renderer.setSize(640, 360);
-camera.useQuarternian = true;
-console.log(timestamp);
+
+var clock = new THREE.Clock();
+
+var controls = new THREE.FlyControls(camera);
+controls.movementSpeed = 0.5;
+controls.domElement = utils.getById("imgCan");
+controls.rollSpeed = Math.PI / 24;
+controls.autoForward = false;
+controls.dragToLook = false;
 document.body.appendChild(renderer.domElement);
+
 
 cubes.push([new THREE.Mesh(new THREE.CubeGeometry(utils.cubeSize / 10, utils.cubeSize / 10, utils.cubeSize / 10), new THREE.MeshLambertMaterial({
 	color : 0x00ff00
@@ -51,9 +67,11 @@ cubes.push([new THREE.Mesh(new THREE.CubeGeometry(utils.cubeSize / 10, utils.cub
 }]);
 
 for (var i in cubes) {
+	if (cubes.hasOwnProperty(i)){
 	var zed = cubes[i][0];
 	zed.position = cubes[i][1];
 	scene.add(cubes[i][0]);
+	}
 }
 // create a point light
 var pointLight = new THREE.PointLight(0xFFFFFF);
@@ -68,16 +86,17 @@ pointLight.position = {
 // add to the scene
 scene.add(pointLight);
 
-camera.position = {
-	x : utils.cubeSize / 2,
-	y : 0,
-	z : utils.cubeSize / 2
-};
 function render() {
+	var delta = clock.getDelta();
+//	console.log(delta);
 	parseVals();
 	//checkVel();
-	requestAnimationFrame(render);
+
+	controls.update(delta);
 	renderer.render(scene, camera);
+	requestAnimationFrame(render);
+	
+
 }
 
 function parseVals() {
@@ -94,8 +113,8 @@ function parseVals() {
 		yaw = 360 + yaw
 	}
 
-	camera.rotation.y = (360 - yaw) / 57.2957795;
-	camera.rotation.z = (roll * -1) / 57.2957795;
+	//camera.rotation.y = (360 - yaw) / 57.2957795;
+	//camera.rotation.z = (roll * -1) / 57.2957795;
 }
 
 //window.setInterval(checkVel,250);
@@ -106,9 +125,9 @@ function checkVel() {
 	console.log(camera.position.x);
 	console.log(camera.position.y);
 	console.log(camera.position.z);
-	camera.position.x += vel[2];
-	camera.position.y += vel[1];
-	camera.position.z += vel[0];
+	//camera.position.x += vel[2];
+	//camera.position.y += vel[1];
+	//camera.position.z += vel[0];
 
 	if (camera.position.x > utils.cubeSize || camera.position.x < 0) {
 	}
